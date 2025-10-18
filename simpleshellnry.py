@@ -1,0 +1,93 @@
+import streamlit as st
+import subprocess
+import shlex
+import os
+import threading
+
+# --- Title ---
+st.title("🖥️ MySimpleShell - Web Interface")
+
+# --- Command input ---
+st.markdown("### Run Shell Commands")
+command = st.text_input("Enter command:", placeholder="e.g., ls | grep py")
+background = st.checkbox("Run in background (&)")
+run_button = st.button("Run")
+
+output_area = st.empty()
+
+# --- Helper functions ---
+def run_pipeline(cmds):
+    procs = []
+    prev = None
+    for cmd in cmds:
+        args = shlex.split(cmd)
+        p = subprocess.Popen(args, stdin=prev.stdout if prev else None,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if prev:
+            prev.stdout.close()
+        prev = p
+        procs.append(p)
+    out, err = procs[-1].communicate()
+    for p in procs[:-1]:
+        p.wait()
+    return out, err
+
+def handle_command(cmd, background=False):
+    if "|" in cmd:
+        cmds = [c.strip() for c in cmd.split("|")]
+        if background:
+            threading.Thread(target=run_pipeline, args=(cmds,), daemon=True).start()
+            return "[Running pipeline in background]\n"
+        out, err = run_pipeline(cmds)
+        return out + err
+    if ">" in cmd and ">>" not in cmd:
+        parts = cmd.split(">")
+        command = parts[0].strip()
+        outfile = parts[1].strip()
+        with open(outfile, "w") as f:
+            subprocess.run(shlex.split(command), stdout=f, text=True)
+        return f"Output written to {outfile}\n"
+    if ">>" in cmd:
+        parts = cmd.split(">>")
+        command = parts[0].strip()
+        outfile = parts[1].strip()
+        with open(outfile, "a") as f:
+            subprocess.run(shlex.split(command), stdout=f, text=True)
+        return f"Output appended to {outfile}\n"
+    if "<" in cmd:
+        parts = cmd.split("<")
+        command = parts[0].strip()
+        infile = parts[1].strip()
+        with open(infile, "r") as f:
+            result = subprocess.run(shlex.split(command), stdin=f, capture_output=True, text=True)
+        return result.stdout + result.stderr
+    if background:
+        subprocess.Popen(shlex.split(cmd))
+        return f"[Running in background] {cmd}\n"
+    result = subprocess.run(shlex.split(cmd), capture_output=True, text=True)
+    return result.stdout + result.stderr
+
+# --- Run button logic ---
+if run_button:
+    if command.strip():
+        out = handle_command(command.strip(), background)
+        output_area.code(out or "(no output)")
+
+# --- File creation section ---
+st.markdown("---")
+st.subheader("📁 Create and View File")
+
+filename = st.text_input("Filename:", "notes.txt")
+content = st.text_area("File content:", "Hello from my simple shell!")
+
+if st.button("Create File"):
+    with open(filename, "w") as f:
+        f.write(content)
+    st.success(f"File '{filename}' created!")
+    with open(filename, "r") as f:
+        st.code(f.read())
+
+# --- Show existing files ---
+st.markdown("### 📂 Existing Files in VM:")
+files = os.listdir(".")
+st.write(files)
