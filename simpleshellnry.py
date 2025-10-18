@@ -4,10 +4,8 @@ import shlex
 import os
 import threading
 
-# --- Title ---
 st.title("🖥️ MySimpleShell - Web Interface")
 
-# --- Command input ---
 st.markdown("### Run Shell Commands")
 command = st.text_input("Enter command:", placeholder="e.g., ls | grep py")
 background = st.checkbox("Run in background (&)")
@@ -15,7 +13,7 @@ run_button = st.button("Run")
 
 output_area = st.empty()
 
-# --- Helper functions ---
+# --- Helper function for pipelines ---
 def run_pipeline(cmds):
     procs = []
     prev = None
@@ -32,40 +30,57 @@ def run_pipeline(cmds):
         p.wait()
     return out, err
 
+# --- Modified handle_command with operation labels ---
 def handle_command(cmd, background=False):
+    # Piping
     if "|" in cmd:
         cmds = [c.strip() for c in cmd.split("|")]
+        operation = "Piping"
         if background:
             threading.Thread(target=run_pipeline, args=(cmds,), daemon=True).start()
-            return "[Running pipeline in background]\n"
+            return f"[{operation} - Running in background]\n"
         out, err = run_pipeline(cmds)
-        return out + err
+        return f"[{operation}]\n" + out + err
+
+    # Output redirection
     if ">" in cmd and ">>" not in cmd:
         parts = cmd.split(">")
         command = parts[0].strip()
         outfile = parts[1].strip()
+        operation = "Output Redirection"
         with open(outfile, "w") as f:
             subprocess.run(shlex.split(command), stdout=f, text=True)
-        return f"Output written to {outfile}\n"
+        return f"[{operation}] Output written to {outfile}\n"
+
     if ">>" in cmd:
         parts = cmd.split(">>")
         command = parts[0].strip()
         outfile = parts[1].strip()
+        operation = "Output Redirection (Append)"
         with open(outfile, "a") as f:
             subprocess.run(shlex.split(command), stdout=f, text=True)
-        return f"Output appended to {outfile}\n"
+        return f"[{operation}] Output appended to {outfile}\n"
+
+    # Input redirection
     if "<" in cmd:
         parts = cmd.split("<")
         command = parts[0].strip()
         infile = parts[1].strip()
+        operation = "Input Redirection"
         with open(infile, "r") as f:
             result = subprocess.run(shlex.split(command), stdin=f, capture_output=True, text=True)
-        return result.stdout + result.stderr
+        return f"[{operation}]\n" + result.stdout + result.stderr
+
+    # Background process
     if background:
+        operation = "Process Creation (Background)"
         subprocess.Popen(shlex.split(cmd))
-        return f"[Running in background] {cmd}\n"
+        return f"[{operation}] {cmd}\n"
+
+    # Normal command execution
+    operation = "Process Execution"
     result = subprocess.run(shlex.split(cmd), capture_output=True, text=True)
-    return result.stdout + result.stderr
+    return f"[{operation}]\n" + result.stdout + result.stderr
 
 # --- Run button logic ---
 if run_button:
@@ -91,3 +106,4 @@ if st.button("Create File"):
 st.markdown("### 📂 Existing Files in VM:")
 files = os.listdir(".")
 st.write(files)
+
