@@ -1,138 +1,104 @@
 import streamlit as st
 import subprocess
-import os
 from io import BytesIO
 
 # ============================
-# 🎨 Custom CSS Styling
+# PAGE CONFIG + STYLE
 # ============================
-st.set_page_config(page_title="NeoShell: Interactive Command Hub", page_icon="💠", layout="centered")
+st.set_page_config(page_title="NeoShell: Interactive Command Hub", page_icon="💠")
 
 st.markdown("""
     <style>
-        body {
-            background-color: #f4f7fb;
-            color: #222;
-            font-family: 'Segoe UI', sans-serif;
-        }
-        .main-title {
-            font-size: 2.5em;
-            font-weight: 700;
-            color: #004aad;
-            text-align: center;
-            margin-bottom: 0.3em;
-        }
-        .sub-title {
-            font-size: 1.1em;
-            color: #5b5b5b;
-            text-align: center;
-            margin-bottom: 2em;
-        }
-        .stTextInput > div > div > input {
-            border: 2px solid #004aad !important;
-            border-radius: 10px !important;
-            padding: 10px !important;
-        }
+        body {background-color: #eef3fb;}
+        .main-title {font-size: 2.4em; font-weight: 700; color: #004aad; text-align:center;}
         .stButton>button {
-            background-color: #007bff !important;
+            background-color: #0066ff !important;
             color: white !important;
             border-radius: 10px !important;
-            height: 45px;
-            width: 100%;
             font-weight: 600;
             font-size: 16px;
-        }
-        .stButton>button:hover {
-            background-color: #0056b3 !important;
-            transform: scale(1.03);
-        }
-        .stDownloadButton>button {
-            background-color: #28a745 !important;
-            color: white !important;
-            border-radius: 10px !important;
-            height: 45px;
             width: 100%;
-            font-weight: 600;
-            font-size: 16px;
+            height: 45px;
         }
-        .stDownloadButton>button:hover {
-            background-color: #1e7e34 !important;
-            transform: scale(1.03);
+        .stButton>button:hover {transform: scale(1.03);}
+        .file-box {
+            border: 2px solid #004aad;
+            padding: 10px;
+            border-radius: 10px;
+            background-color: #ffffff;
+            margin-bottom: 10px;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# ============================
-# 🧠 Title Section
-# ============================
 st.markdown("<div class='main-title'>💠 NeoShell: Interactive Command Hub</div>", unsafe_allow_html=True)
-st.markdown("<div class='sub-title'>Run commands, create files, and explore process operations — all in one clean, technical shell.</div>", unsafe_allow_html=True)
+
+# Store files in session
+if "files" not in st.session_state:
+    st.session_state.files = {}
 
 # ============================
-# 🧱 Command Execution
+# COMMAND EXECUTION
 # ============================
-st.markdown("### 🧩 Command Execution")
+st.subheader("🧩 Command Execution")
 
 col1, col2, col3 = st.columns([7, 2, 2])
-cmd_input = col1.text_input("", placeholder="e.g., echo Hello | findstr H  or  echo Hi > out.txt")
+cmd = col1.text_input("", placeholder="Example: echo Hello | findstr H")
 run_bg = col2.checkbox("Run in BG")
-run_now = col3.button("🚀 Execute")
+run_btn = col3.button("🚀 Execute")
 
-if run_now and cmd_input:
+if run_btn and cmd.strip():
     try:
         if run_bg:
-            subprocess.Popen(cmd_input, shell=True)
+            subprocess.Popen(cmd, shell=True)
             st.success("✅ Command running in background!")
         else:
-            result = subprocess.run(cmd_input, shell=True, capture_output=True, text=True)
-            st.code(result.stdout if result.stdout else result.stderr or "✅ Command executed successfully.", language="bash")
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            st.code(result.stdout if result.stdout else result.stderr or "Done ✅")
     except Exception as e:
         st.error(f"❌ Error: {e}")
 
 # ============================
-# 📝 File Creation Section
+# FILE CREATION
 # ============================
-st.markdown("### 📂 Create & Download a File")
+st.subheader("📂 Create a File")
 
-filename = st.text_input("Enter file name (with .txt or .docx extension):", "os_output.txt")
-file_content = st.text_area("Enter file content:", height=150, placeholder="Type your file content here...")
+fname = st.text_input("File name:", "output.txt")
+fdata = st.text_area("Enter file content:")
 
-if st.button("💾 Create & Download File"):
-    if filename.strip():
-        try:
-            # Save file temporarily in memory for download
-            buffer = BytesIO()
-            buffer.write(file_content.encode())
-            buffer.seek(0)
+if st.button("💾 Save File"):
+    if fname.strip():
+        st.session_state.files[fname] = fdata.encode()
+        st.success(f"✅ File '{fname}' saved successfully!")
+    else:
+        st.warning("⚠️ Enter a valid file name.")
 
-            st.download_button(
-                label="⬇️ Download Your File",
-                data=buffer,
-                file_name=filename,
+# ============================
+# FILES CREATED SECTION ✅
+# ============================
+st.subheader("🗂️ Files Created")
+
+if st.session_state.files:
+    for file_name, file_bytes in st.session_state.files.items():
+        with st.container():
+            st.markdown(f"<div class='file-box'><b>{file_name}</b></div>", unsafe_allow_html=True)
+
+            dcol1, dcol2 = st.columns([2, 2])
+
+            # View content
+            if dcol1.button(f"📖 View {file_name}", key=file_name):
+                st.text_area("Content:", file_bytes.decode(), height=120)
+
+            # Download
+            dcol2.download_button(
+                label=f"⬇️ Download {file_name}",
+                data=file_bytes,
+                file_name=file_name,
                 mime="text/plain"
             )
-            st.success(f"✅ File '{filename}' created successfully! Click above to download.")
-        except Exception as e:
-            st.error(f"❌ Error creating file: {e}")
-    else:
-        st.warning("⚠️ Please enter a valid filename.")
+else:
+    st.info("📭 No files created yet!")
 
-# ============================
-# ⚙️ System Info Section
-# ============================
-st.markdown("### 🖥️ Quick System Info")
-try:
-    uname = os.uname()
-    st.text(f"System: {uname.sysname}")
-    st.text(f"Node Name: {uname.nodename}")
-    st.text(f"Release: {uname.release}")
-    st.text(f"Version: {uname.version}")
-    st.text(f"Machine: {uname.machine}")
-except Exception:
-    st.info("ℹ️ System info not available on this platform.")
 
-# ============================
-# 📘 Footer
-# ============================
 st.markdown("<hr>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#777;'>🧠 Developed with 💙 using Streamlit • NeoShell v2.0</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#555;'>NeoShell v3.0 — Enhanced File Manager ✅</p>", unsafe_allow_html=True)
