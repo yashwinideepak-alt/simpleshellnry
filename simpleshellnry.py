@@ -4,20 +4,71 @@ import shlex
 import os
 import threading
 import base64
-from io import BytesIO
 from datetime import datetime
 
-# ---------- Page config ----------
-st.set_page_config(page_title="MySimpleShell", page_icon="💻", layout="centered")
+# ---------- Page Configuration ----------
+st.set_page_config(
+    page_title="NeoShell: Interactive Command Hub",
+    page_icon="💠",
+    layout="centered"
+)
 
-st.title("💻 MySimpleShell")
-st.markdown("Light, simple shell UI — runs commands, supports pipes/redirection/background, and auto-downloads created files.")
+# ---------- Custom Styling ----------
+st.markdown("""
+<style>
+/* Overall page background */
+.stApp {
+    background-color: #f6f9fc;
+}
 
-# create a local folder in the app environment (not required for download, but useful to keep files)
+/* Headers */
+h1, h2, h3, h4 {
+    color: #0a2342;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Inputs and buttons */
+.stTextInput > div > div > input, textarea {
+    background-color: #ffffff !important;
+    border: 1px solid #b8c2cc !important;
+    border-radius: 10px !important;
+    color: #0a2342 !important;
+}
+
+.stButton > button {
+    background-color: #0078d4 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 500;
+    padding: 0.6em 1.2em !important;
+    transition: background-color 0.2s ease;
+}
+
+.stButton > button:hover {
+    background-color: #005fa3 !important;
+}
+
+/* Code blocks */
+code, pre {
+    background-color: #eaf1f8 !important;
+    color: #0a2342 !important;
+    border-radius: 8px;
+    padding: 0.6em;
+    font-size: 0.9em;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------- Header ----------
+st.markdown("<h1 style='text-align:center;'>💠 NeoShell: Interactive Command Hub</h1>", unsafe_allow_html=True)
+st.caption("A lightweight virtual shell environment — Execute, Redirect, and Manage processes seamlessly.")
+
+# ---------- Folder setup ----------
 BASE_DIR = "Documents"
 os.makedirs(BASE_DIR, exist_ok=True)
 
-# ---------- Helper: pipeline runner ----------
+# ---------- Core Logic ----------
 def run_pipeline(cmds):
     procs = []
     prev = None
@@ -35,33 +86,25 @@ def run_pipeline(cmds):
         p.wait()
     return out, err
 
-# ---------- Command handler ----------
 def handle_command(cmd: str, background: bool=False):
     cmd = cmd.strip()
     try:
         if not cmd:
             return "(no command entered)"
-
-        # piping
         if "|" in cmd:
             parts = [p.strip() for p in cmd.split("|")]
             if background:
                 threading.Thread(target=lambda: run_pipeline(parts), daemon=True).start()
                 return "[Piping] started in background"
             out, err = run_pipeline(parts)
-            header = "[Piping]\n"
-            return header + (out or "") + (err or "")
-
-        # append redirection
+            return "[Piping]\n" + (out or "") + (err or "")
         if ">>" in cmd:
             left, right = cmd.split(">>", 1)
             args = shlex.split(left)
             filename = right.strip()
             with open(os.path.join(BASE_DIR, filename), "a", encoding="utf-8") as f:
                 subprocess.run(args, stdout=f, stderr=subprocess.PIPE, text=True)
-            return f"[Output Redirection (Append)] appended to {filename}"
-
-        # output redirection
+            return f"[Append Redirection] added to {filename}"
         if ">" in cmd:
             left, right = cmd.split(">", 1)
             args = shlex.split(left)
@@ -69,8 +112,6 @@ def handle_command(cmd: str, background: bool=False):
             with open(os.path.join(BASE_DIR, filename), "w", encoding="utf-8") as f:
                 subprocess.run(args, stdout=f, stderr=subprocess.PIPE, text=True)
             return f"[Output Redirection] written to {filename}"
-
-        # input redirection
         if "<" in cmd:
             left, right = cmd.split("<", 1)
             args = shlex.split(left)
@@ -78,99 +119,72 @@ def handle_command(cmd: str, background: bool=False):
             with open(os.path.join(BASE_DIR, filename), "r", encoding="utf-8") as f:
                 p = subprocess.run(args, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             return "[Input Redirection]\n" + (p.stdout or "") + (p.stderr or "")
-
-        # background process
         if background or cmd.endswith("&"):
-            # strip trailing &
             clean_cmd = cmd.rstrip("&").strip()
             threading.Thread(target=lambda: subprocess.Popen(clean_cmd, shell=True), daemon=True).start()
-            return f"[Process Creation (Background)] {clean_cmd}"
-
-        # normal execution
+            return f"[Background Process] started: {clean_cmd}"
         p = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return "[Process Execution]\n" + (p.stdout or p.stderr or "(no output)")
-    except FileNotFoundError:
-        return "Error: command not found"
+        return "[Execution Result]\n" + (p.stdout or p.stderr or "(no output)")
     except Exception as e:
         return f"Error: {e}"
 
-# ---------- UI: Commands ----------
-st.subheader("Run a command")
+# ---------- Command Section ----------
+st.markdown("### ⚙️ Command Execution")
 col1, col2 = st.columns([8,1])
-cmd_input = col1.text_input("", placeholder="e.g., echo Hello | grep H  OR  echo Hi > out.txt")
-run_bg = col2.checkbox("Background")
-run_now = col2.button("Run")
+cmd_input = col1.text_input("", placeholder="e.g., echo Hello | grep H  or  echo Hi > out.txt")
+run_bg = col2.checkbox("Run in BG")
+run_now = col2.button("Execute 🔹")
 
 if run_now:
-    if cmd_input.strip() == "":
-        st.warning("Enter a command first.")
+    if cmd_input.strip():
+        result = handle_command(cmd_input, background=run_bg)
+        st.code(result, language="bash")
     else:
-        output = handle_command(cmd_input, background=run_bg)
-        st.code(output, language="bash")
+        st.warning("Enter a valid command.")
 
-# ---------- UI: File creation (auto-download) ----------
+# ---------- File Creation ----------
 st.markdown("---")
-st.subheader("Create a file (auto-download)")
+st.markdown("### 📂 File Creation")
 
 fcol1, fcol2 = st.columns([3,7])
-filename = fcol1.text_input("Filename (e.g., notes.txt)", value="")
-content = fcol2.text_area("File content", value="", height=160)
+filename = fcol1.text_input("File Name", placeholder="e.g., report.txt")
+content = fcol2.text_area("File Content", height=180, placeholder="Enter text here...")
 
-create_clicked = st.button("Create File and Download")
+create_clicked = st.button("Create & Auto-Download ⬇️")
 
 if create_clicked:
     if not filename.strip():
-        st.warning("Please enter a filename (e.g., notes.txt).")
+        st.warning("Please enter a filename.")
     else:
-        # save in app environment
-        path = os.path.join(BASE_DIR, filename)
-        try:
-            with open(path, "w", encoding="utf-8") as fh:
-                fh.write(content)
-        except Exception as e:
-            st.error(f"Could not save file in app environment: {e}")
-            path = None
+        file_path = os.path.join(BASE_DIR, filename)
+        with open(file_path, "w", encoding="utf-8") as fh:
+            fh.write(content)
 
-        # prepare bytes for download
         data_bytes = content.encode("utf-8")
         b64 = base64.b64encode(data_bytes).decode()
-        data_href = f"data:application/octet-stream;base64,{b64}"
+        href = f"data:application/octet-stream;base64,{b64}"
 
-        st.success(f"File '{filename}' created.")
-
-        # Insert an anchor tag and auto-click via JS (works when browser allows it after your interaction)
-        auto_click_html = f"""
-        <a id="dl" href="{data_href}" download="{filename}">Download link</a>
-        <script>
-        const a = document.getElementById('dl');
-        if (a) {{
-            a.click();
-        }}
-        </script>
+        st.success(f"File '{filename}' created successfully.")
+        auto_html = f"""
+        <a id="dl" href="{href}" download="{filename}">Download</a>
+        <script>document.getElementById('dl').click();</script>
         """
-        st.markdown(auto_click_html, unsafe_allow_html=True)
+        st.markdown(auto_html, unsafe_allow_html=True)
 
-        # Fallback download button (in case browser blocks auto-click)
-        st.download_button("If not downloaded automatically, click to download", data=data_bytes, file_name=filename, mime="text/plain")
+        st.caption(f"Saved temporarily in app environment: {file_path}")
 
-        # show location inside app environment for reference
-        if path:
-            st.info(f"(Saved in app environment: {path})")
-            st.caption(f"Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-# ---------- UI: Show files in app environment ----------
+# ---------- File Manager ----------
 st.markdown("---")
-st.subheader("Files created in app environment (Documents/)")
+st.markdown("### 🗂️ File Manager")
 
 files = sorted(os.listdir(BASE_DIR))
 if files:
     for fn in files:
         pth = os.path.join(BASE_DIR, fn)
         size = os.path.getsize(pth)
-        st.write(f"• {fn} — {size} bytes")
-        with open(pth, "r", errors="ignore", encoding="utf-8") as fh:
-            txt = fh.read()
+        st.write(f"📘 **{fn}** — {size} bytes")
         with st.expander("Preview " + fn):
-            st.text(txt)
+            with open(pth, "r", errors="ignore", encoding="utf-8") as f:
+                st.text(f.read())
 else:
-    st.info("No files created yet.")
+    st.info("No files yet. Create one above ⬆️")
