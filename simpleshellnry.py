@@ -1,208 +1,138 @@
 import streamlit as st
 import subprocess
-import shlex
 import os
-import threading
-import base64
-from datetime import datetime
+from io import BytesIO
 
-# -------------------- PAGE CONFIG --------------------
-st.set_page_config(
-    page_title="NeoShell: Interactive Command Hub",
-    page_icon="💠",
-    layout="centered"
-)
+# ============================
+# 🎨 Custom CSS Styling
+# ============================
+st.set_page_config(page_title="NeoShell: Interactive Command Hub", page_icon="💠", layout="centered")
 
-# -------------------- CUSTOM STYLE --------------------
 st.markdown("""
-<style>
-/* Background gradient */
-.stApp {
-    background: linear-gradient(135deg, #f0f4f8 0%, #e4ebf5 100%);
-    color: #0a2342;
-    font-family: 'Segoe UI', sans-serif;
-}
-
-/* Title */
-h1 {
-    color: #003366 !important;
-    text-align: center;
-    font-weight: 700;
-}
-
-/* Section headers */
-h3 {
-    color: #005999;
-    border-bottom: 2px solid #cce0ff;
-    padding-bottom: 4px;
-}
-
-/* Input fields */
-.stTextInput > div > div > input, textarea {
-    background-color: #ffffff !important;
-    border: 1.5px solid #99bbff !important;
-    border-radius: 10px !important;
-    color: #0a2342 !important;
-}
-
-/* Buttons */
-.stButton > button {
-    background-color: #0078d7 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 12px !important;
-    font-weight: 600;
-    padding: 0.6em 1.2em !important;
-    transition: all 0.2s ease-in-out;
-}
-
-.stButton > button:hover {
-    background-color: #005fa3 !important;
-    transform: scale(1.02);
-}
-
-/* Code block */
-code, pre {
-    background-color: #f1f6fc !important;
-    color: #001f3f !important;
-    border-radius: 8px;
-    padding: 0.7em;
-    font-size: 0.9em;
-}
-
-/* Boxes and expanders */
-.stExpander {
-    border: 1px solid #cce0ff;
-    border-radius: 10px;
-    background-color: #ffffff;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-}
-</style>
+    <style>
+        body {
+            background-color: #f4f7fb;
+            color: #222;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .main-title {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #004aad;
+            text-align: center;
+            margin-bottom: 0.3em;
+        }
+        .sub-title {
+            font-size: 1.1em;
+            color: #5b5b5b;
+            text-align: center;
+            margin-bottom: 2em;
+        }
+        .stTextInput > div > div > input {
+            border: 2px solid #004aad !important;
+            border-radius: 10px !important;
+            padding: 10px !important;
+        }
+        .stButton>button {
+            background-color: #007bff !important;
+            color: white !important;
+            border-radius: 10px !important;
+            height: 45px;
+            width: 100%;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .stButton>button:hover {
+            background-color: #0056b3 !important;
+            transform: scale(1.03);
+        }
+        .stDownloadButton>button {
+            background-color: #28a745 !important;
+            color: white !important;
+            border-radius: 10px !important;
+            height: 45px;
+            width: 100%;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .stDownloadButton>button:hover {
+            background-color: #1e7e34 !important;
+            transform: scale(1.03);
+        }
+    </style>
 """, unsafe_allow_html=True)
 
-# -------------------- HEADER --------------------
-st.markdown("<h1>💠 NeoShell: Interactive Command Hub</h1>", unsafe_allow_html=True)
-st.caption("A sleek virtual shell — Execute, Redirect, and Manage processes interactively.")
+# ============================
+# 🧠 Title Section
+# ============================
+st.markdown("<div class='main-title'>💠 NeoShell: Interactive Command Hub</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-title'>Run commands, create files, and explore process operations — all in one clean, technical shell.</div>", unsafe_allow_html=True)
 
-BASE_DIR = "Documents"
-os.makedirs(BASE_DIR, exist_ok=True)
+# ============================
+# 🧱 Command Execution
+# ============================
+st.markdown("### 🧩 Command Execution")
 
-# -------------------- CORE LOGIC --------------------
-def run_pipeline(cmds):
-    procs = []
-    prev = None
-    for cmd in cmds:
-        args = shlex.split(cmd)
-        if prev is None:
-            p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        else:
-            p = subprocess.Popen(args, stdin=prev.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            prev.stdout.close()
-        prev = p
-        procs.append(p)
-    out, err = procs[-1].communicate()
-    for p in procs[:-1]:
-        p.wait()
-    return out, err
-
-def handle_command(cmd: str, background: bool=False):
-    cmd = cmd.strip()
-    try:
-        if not cmd:
-            return "(no command entered)"
-        if "|" in cmd:
-            parts = [p.strip() for p in cmd.split("|")]
-            if background:
-                threading.Thread(target=lambda: run_pipeline(parts), daemon=True).start()
-                return "[Piping] started in background"
-            out, err = run_pipeline(parts)
-            return "[Piping]\n" + (out or "") + (err or "")
-        if ">>" in cmd:
-            left, right = cmd.split(">>", 1)
-            args = shlex.split(left)
-            filename = right.strip()
-            with open(os.path.join(BASE_DIR, filename), "a", encoding="utf-8") as f:
-                subprocess.run(args, stdout=f, stderr=subprocess.PIPE, text=True)
-            return f"[Append Redirection] added to {filename}"
-        if ">" in cmd:
-            left, right = cmd.split(">", 1)
-            args = shlex.split(left)
-            filename = right.strip()
-            with open(os.path.join(BASE_DIR, filename), "w", encoding="utf-8") as f:
-                subprocess.run(args, stdout=f, stderr=subprocess.PIPE, text=True)
-            return f"[Output Redirection] written to {filename}"
-        if "<" in cmd:
-            left, right = cmd.split("<", 1)
-            args = shlex.split(left)
-            filename = right.strip()
-            with open(os.path.join(BASE_DIR, filename), "r", encoding="utf-8") as f:
-                p = subprocess.run(args, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            return "[Input Redirection]\n" + (p.stdout or "") + (p.stderr or "")
-        if background or cmd.endswith("&"):
-            clean_cmd = cmd.rstrip("&").strip()
-            threading.Thread(target=lambda: subprocess.Popen(clean_cmd, shell=True), daemon=True).start()
-            return f"[Background Process] started: {clean_cmd}"
-        p = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return "[Execution Result]\n" + (p.stdout or p.stderr or "(no output)")
-    except Exception as e:
-        return f"Error: {e}"
-
-# -------------------- COMMAND EXECUTION SECTION --------------------
-st.markdown("### ⚙️ Command Execution")
-col1, col2 = st.columns([8,1])
+col1, col2, col3 = st.columns([7, 2, 2])
 cmd_input = col1.text_input("", placeholder="e.g., echo Hello | findstr H  or  echo Hi > out.txt")
 run_bg = col2.checkbox("Run in BG")
-run_now = col2.button("Execute 🔹")
+run_now = col3.button("🚀 Execute")
 
-if run_now:
-    if cmd_input.strip():
-        result = handle_command(cmd_input, background=run_bg)
-        st.code(result, language="bash")
+if run_now and cmd_input:
+    try:
+        if run_bg:
+            subprocess.Popen(cmd_input, shell=True)
+            st.success("✅ Command running in background!")
+        else:
+            result = subprocess.run(cmd_input, shell=True, capture_output=True, text=True)
+            st.code(result.stdout if result.stdout else result.stderr or "✅ Command executed successfully.", language="bash")
+    except Exception as e:
+        st.error(f"❌ Error: {e}")
+
+# ============================
+# 📝 File Creation Section
+# ============================
+st.markdown("### 📂 Create & Download a File")
+
+filename = st.text_input("Enter file name (with .txt or .docx extension):", "os_output.txt")
+file_content = st.text_area("Enter file content:", height=150, placeholder="Type your file content here...")
+
+if st.button("💾 Create & Download File"):
+    if filename.strip():
+        try:
+            # Save file temporarily in memory for download
+            buffer = BytesIO()
+            buffer.write(file_content.encode())
+            buffer.seek(0)
+
+            st.download_button(
+                label="⬇️ Download Your File",
+                data=buffer,
+                file_name=filename,
+                mime="text/plain"
+            )
+            st.success(f"✅ File '{filename}' created successfully! Click above to download.")
+        except Exception as e:
+            st.error(f"❌ Error creating file: {e}")
     else:
-        st.warning("Enter a valid command.")
+        st.warning("⚠️ Please enter a valid filename.")
 
-# -------------------- FILE CREATION SECTION --------------------
-st.markdown("---")
-st.markdown("### 📂 File Creation")
+# ============================
+# ⚙️ System Info Section
+# ============================
+st.markdown("### 🖥️ Quick System Info")
+try:
+    uname = os.uname()
+    st.text(f"System: {uname.sysname}")
+    st.text(f"Node Name: {uname.nodename}")
+    st.text(f"Release: {uname.release}")
+    st.text(f"Version: {uname.version}")
+    st.text(f"Machine: {uname.machine}")
+except Exception:
+    st.info("ℹ️ System info not available on this platform.")
 
-fcol1, fcol2 = st.columns([3,7])
-filename = fcol1.text_input("File Name", placeholder="e.g., project.txt")
-content = fcol2.text_area("File Content", height=180, placeholder="Type your file content here...")
-
-create_clicked = st.button("Create & Auto-Download ⬇️")
-
-if create_clicked:
-    if not filename.strip():
-        st.warning("Please enter a filename.")
-    else:
-        file_path = os.path.join(BASE_DIR, filename)
-        with open(file_path, "w", encoding="utf-8") as fh:
-            fh.write(content)
-
-        data_bytes = content.encode("utf-8")
-        b64 = base64.b64encode(data_bytes).decode()
-        href = f"data:application/octet-stream;base64,{b64}"
-
-        st.success(f"File '{filename}' created successfully.")
-        auto_html = f"""
-        <a id="dl" href="{href}" download="{filename}"></a>
-        <script>document.getElementById('dl').click();</script>
-        """
-        st.markdown(auto_html, unsafe_allow_html=True)
-        st.caption(f"File stored temporarily in app environment: {file_path}")
-
-# -------------------- FILE MANAGER --------------------
-st.markdown("---")
-st.markdown("### 🗂️ File Manager")
-
-files = sorted(os.listdir(BASE_DIR))
-if files:
-    for fn in files:
-        pth = os.path.join(BASE_DIR, fn)
-        size = os.path.getsize(pth)
-        st.write(f"📘 **{fn}** — {size} bytes")
-        with st.expander("Preview " + fn):
-            with open(pth, "r", errors="ignore", encoding="utf-8") as f:
-                st.text(f.read())
-else:
-    st.info("No files created yet. Create one above ⬆️")
+# ============================
+# 📘 Footer
+# ============================
+st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#777;'>🧠 Developed with 💙 using Streamlit • NeoShell v2.0</p>", unsafe_allow_html=True)
