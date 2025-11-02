@@ -4,15 +4,20 @@ import shlex
 import os
 import threading
 from datetime import datetime
+from pathlib import Path
 
-# ------------- Streamlit Page Setup -------------
+# ------------- Page Setup -------------
 st.set_page_config(page_title="MySimpleShell", page_icon="💻", layout="wide")
 
-st.markdown("<h1 style='text-align:center; color:#4CAF50;'>💻 MySimpleShell - Interactive Shell Environment</h1>", unsafe_allow_html=True)
-st.write("### Run shell commands with process execution, redirection, piping, and background operations.")
+st.markdown("<h1 style='text-align:center; color:#4CAF50;'>💻 MySimpleShell - Local Shell Interface</h1>", unsafe_allow_html=True)
+st.write("### Execute commands, handle redirection, and create files automatically in your Documents folder.")
+
+# Get user's Documents path automatically
+documents_path = Path.home() / "Documents"
+documents_path.mkdir(exist_ok=True)  # Create if not exists
 
 
-# ------------- Command Handling Logic -------------
+# ------------- Command Handling -------------
 def run_pipeline(cmds):
     """Handles piped commands"""
     processes = []
@@ -83,14 +88,12 @@ def handle_command(cmd, background=False):
         return f"Error: {str(e)}"
 
 
-# ------------- Shell Interface Section -------------
+# ------------- Shell Section -------------
 st.markdown("## ⚙️ Execute a Shell Command")
 
-command = st.text_input("Enter command:", placeholder="e.g., dir | findstr py (for Windows)")
+command = st.text_input("Enter command:", placeholder="e.g., dir | findstr py (Windows example)")
 background = st.checkbox("Run in background (&)")
-run_button = st.button("Run Command")
-
-if run_button:
+if st.button("Run Command"):
     if command.strip():
         output = handle_command(command.strip(), background)
         st.code(output or "(no output)", language="bash")
@@ -100,35 +103,38 @@ if run_button:
 
 # ------------- File Creation Section -------------
 st.markdown("---")
-st.markdown("## 🗂️ Create a New File and Save to Local Drive")
+st.markdown("## 🗂️ Create a New File in Documents")
 
-filename = st.text_input("Enter filename (e.g., C:/Users/YourName/Desktop/test.txt):", "C:/Users/Public/sample.txt")
-content = st.text_area("Enter file content:", "This is a sample file created from MySimpleShell.")
+filename = st.text_input("Enter filename (e.g., notes.txt):", "")
+content = st.text_area("Enter file content:", "Write your text here...")
 
 if st.button("Create File"):
-    try:
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write(content)
-        st.success(f"✅ File successfully saved to your system at: {filename}")
+    if filename.strip() == "":
+        st.warning("Please enter a filename.")
+    else:
+        try:
+            filepath = documents_path / filename
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+            st.success(f"✅ File '{filename}' saved in Documents folder!")
+            st.info(f"Location: {filepath}")
+            st.caption(f"Created on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        except Exception as e:
+            st.error(f"❌ Error saving file: {str(e)}")
 
-        # Add timestamp for reference
-        st.info(f"Created on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    except Exception as e:
-        st.error(f"❌ Error saving file: {str(e)}")
-
-
-# ------------- List Files (Optional for Local Path) -------------
+# ------------- Display Files in Documents -------------
 st.markdown("---")
-st.markdown("## 📁 View Files in a Folder")
+st.markdown("## 📁 Files Currently in Documents Folder")
 
-path = st.text_input("Enter folder path (e.g., C:/Users/Public):", "C:/Users/Public")
-if st.button("List Files"):
-    try:
-        files = os.listdir(path)
+try:
+    files = os.listdir(documents_path)
+    if files:
         st.write(files)
-    except Exception as e:
-        st.error(f"Error accessing folder: {str(e)}")
+    else:
+        st.write("📭 No files found in your Documents folder yet.")
+except Exception as e:
+    st.error(f"Error accessing Documents: {str(e)}")
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:gray;'>Developed with ❤️ using Python and Streamlit</p>", unsafe_allow_html=True)
