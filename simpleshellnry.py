@@ -6,69 +6,88 @@ import threading
 import base64
 from datetime import datetime
 
-# ---------- Page Configuration ----------
+# -------------------- PAGE CONFIG --------------------
 st.set_page_config(
     page_title="NeoShell: Interactive Command Hub",
     page_icon="💠",
     layout="centered"
 )
 
-# ---------- Custom Styling ----------
+# -------------------- CUSTOM STYLE --------------------
 st.markdown("""
 <style>
-/* Overall page background */
+/* Background gradient */
 .stApp {
-    background-color: #f6f9fc;
-}
-
-/* Headers */
-h1, h2, h3, h4 {
+    background: linear-gradient(135deg, #f0f4f8 0%, #e4ebf5 100%);
     color: #0a2342;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Segoe UI', sans-serif;
 }
 
-/* Inputs and buttons */
+/* Title */
+h1 {
+    color: #003366 !important;
+    text-align: center;
+    font-weight: 700;
+}
+
+/* Section headers */
+h3 {
+    color: #005999;
+    border-bottom: 2px solid #cce0ff;
+    padding-bottom: 4px;
+}
+
+/* Input fields */
 .stTextInput > div > div > input, textarea {
     background-color: #ffffff !important;
-    border: 1px solid #b8c2cc !important;
+    border: 1.5px solid #99bbff !important;
     border-radius: 10px !important;
     color: #0a2342 !important;
 }
 
+/* Buttons */
 .stButton > button {
-    background-color: #0078d4 !important;
+    background-color: #0078d7 !important;
     color: white !important;
     border: none !important;
-    border-radius: 10px !important;
-    font-weight: 500;
+    border-radius: 12px !important;
+    font-weight: 600;
     padding: 0.6em 1.2em !important;
-    transition: background-color 0.2s ease;
+    transition: all 0.2s ease-in-out;
 }
 
 .stButton > button:hover {
     background-color: #005fa3 !important;
+    transform: scale(1.02);
 }
 
-/* Code blocks */
+/* Code block */
 code, pre {
-    background-color: #eaf1f8 !important;
-    color: #0a2342 !important;
+    background-color: #f1f6fc !important;
+    color: #001f3f !important;
     border-radius: 8px;
-    padding: 0.6em;
+    padding: 0.7em;
     font-size: 0.9em;
+}
+
+/* Boxes and expanders */
+.stExpander {
+    border: 1px solid #cce0ff;
+    border-radius: 10px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Header ----------
-st.markdown("<h1 style='text-align:center;'>💠 NeoShell: Interactive Command Hub</h1>", unsafe_allow_html=True)
-st.caption("A lightweight virtual shell environment — Execute, Redirect, and Manage processes seamlessly.")
+# -------------------- HEADER --------------------
+st.markdown("<h1>💠 NeoShell: Interactive Command Hub</h1>", unsafe_allow_html=True)
+st.caption("A sleek virtual shell — Execute, Redirect, and Manage processes interactively.")
 
-# ---------- Folder setup ----------
 BASE_DIR = "Documents"
 os.makedirs(BASE_DIR, exist_ok=True)
 
-# ---------- Core Logic ----------
+# -------------------- CORE LOGIC --------------------
 def run_pipeline(cmds):
     procs = []
     prev = None
@@ -128,10 +147,10 @@ def handle_command(cmd: str, background: bool=False):
     except Exception as e:
         return f"Error: {e}"
 
-# ---------- Command Section ----------
+# -------------------- COMMAND EXECUTION SECTION --------------------
 st.markdown("### ⚙️ Command Execution")
 col1, col2 = st.columns([8,1])
-cmd_input = col1.text_input("", placeholder="e.g., echo Hello | grep H  or  echo Hi > out.txt")
+cmd_input = col1.text_input("", placeholder="e.g., echo Hello | findstr H  or  echo Hi > out.txt")
 run_bg = col2.checkbox("Run in BG")
 run_now = col2.button("Execute 🔹")
 
@@ -142,13 +161,13 @@ if run_now:
     else:
         st.warning("Enter a valid command.")
 
-# ---------- File Creation ----------
+# -------------------- FILE CREATION SECTION --------------------
 st.markdown("---")
 st.markdown("### 📂 File Creation")
 
 fcol1, fcol2 = st.columns([3,7])
-filename = fcol1.text_input("File Name", placeholder="e.g., report.txt")
-content = fcol2.text_area("File Content", height=180, placeholder="Enter text here...")
+filename = fcol1.text_input("File Name", placeholder="e.g., project.txt")
+content = fcol2.text_area("File Content", height=180, placeholder="Type your file content here...")
 
 create_clicked = st.button("Create & Auto-Download ⬇️")
 
@@ -166,14 +185,13 @@ if create_clicked:
 
         st.success(f"File '{filename}' created successfully.")
         auto_html = f"""
-        <a id="dl" href="{href}" download="{filename}">Download</a>
+        <a id="dl" href="{href}" download="{filename}"></a>
         <script>document.getElementById('dl').click();</script>
         """
         st.markdown(auto_html, unsafe_allow_html=True)
+        st.caption(f"File stored temporarily in app environment: {file_path}")
 
-        st.caption(f"Saved temporarily in app environment: {file_path}")
-
-# ---------- File Manager ----------
+# -------------------- FILE MANAGER --------------------
 st.markdown("---")
 st.markdown("### 🗂️ File Manager")
 
@@ -187,4 +205,4 @@ if files:
             with open(pth, "r", errors="ignore", encoding="utf-8") as f:
                 st.text(f.read())
 else:
-    st.info("No files yet. Create one above ⬆️")
+    st.info("No files created yet. Create one above ⬆️")
