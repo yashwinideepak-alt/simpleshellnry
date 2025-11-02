@@ -3,16 +3,16 @@ import subprocess
 import shlex
 import os
 import threading
-from docx import Document
-import base64
+from datetime import datetime
 
-st.set_page_config(page_title="Simple Shell", page_icon="💻", layout="centered")
+# ------------- Streamlit Page Setup -------------
+st.set_page_config(page_title="MySimpleShell", page_icon="💻", layout="wide")
 
-st.title("💻 MySimpleShell - Interactive Web Shell")
-st.write("Run shell commands with process execution, piping, redirection, and background support.")
+st.markdown("<h1 style='text-align:center; color:#4CAF50;'>💻 MySimpleShell - Interactive Shell Environment</h1>", unsafe_allow_html=True)
+st.write("### Run shell commands with process execution, redirection, piping, and background operations.")
 
 
-# ---------- Command Handling ----------
+# ------------- Command Handling Logic -------------
 def run_pipeline(cmds):
     """Handles piped commands"""
     processes = []
@@ -74,7 +74,7 @@ def handle_command(cmd, background=False):
             threading.Thread(target=background_run).start()
             return f"[Process Creation (Background)] {cmd}"
 
-        # Normal Command
+        # Normal Execution
         else:
             result = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             return f"[Process Execution]\n{result.stdout.decode() or result.stderr.decode()}"
@@ -83,57 +83,52 @@ def handle_command(cmd, background=False):
         return f"Error: {str(e)}"
 
 
-# ---------- Streamlit UI ----------
-st.subheader("🧠 Execute Shell Command")
+# ------------- Shell Interface Section -------------
+st.markdown("## ⚙️ Execute a Shell Command")
 
-command = st.text_input("Enter command:", placeholder="e.g., ls | grep py")
+command = st.text_input("Enter command:", placeholder="e.g., dir | findstr py (for Windows)")
 background = st.checkbox("Run in background (&)")
-run_button = st.button("Run")
+run_button = st.button("Run Command")
 
 if run_button:
     if command.strip():
         output = handle_command(command.strip(), background)
         st.code(output or "(no output)", language="bash")
     else:
-        st.warning("Please enter a command.")
+        st.warning("Please enter a command before running.")
 
 
-# ---------- File Creation with Word Export ----------
-st.subheader("📄 Create a New File")
+# ------------- File Creation Section -------------
+st.markdown("---")
+st.markdown("## 🗂️ Create a New File and Save to Local Drive")
 
-filename = st.text_input("Filename:", "notes.txt")
-content = st.text_area("File content:", "Hello from my simple shell!")
+filename = st.text_input("Enter filename (e.g., C:/Users/YourName/Desktop/test.txt):", "C:/Users/Public/sample.txt")
+content = st.text_area("Enter file content:", "This is a sample file created from MySimpleShell.")
 
 if st.button("Create File"):
     try:
-        # Save as .txt file
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding="utf-8") as f:
             f.write(content)
-        st.success(f"✅ File '{filename}' created successfully!")
+        st.success(f"✅ File successfully saved to your system at: {filename}")
 
-        # Create Word (.docx) version
-        doc = Document()
-        doc.add_heading(filename.replace('.txt', ''), level=1)
-        doc.add_paragraph(content)
-        word_filename = filename.replace('.txt', '') + ".docx"
-        doc.save(word_filename)
-
-        # Create download link
-        with open(word_filename, "rb") as file:
-            b64 = base64.b64encode(file.read()).decode()
-        href = f'<a href="data:application/octet-stream;base64,{b64}" download="{word_filename}">📥 Download {word_filename}</a>'
-        st.markdown(href, unsafe_allow_html=True)
+        # Add timestamp for reference
+        st.info(f"Created on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     except Exception as e:
-        st.error(f"Error creating file: {str(e)}")
+        st.error(f"❌ Error saving file: {str(e)}")
 
 
-# ---------- Existing Files Section ----------
-st.subheader("📂 Existing Files in VM")
-try:
-    files = os.listdir(".")
-    st.write(files)
-except Exception as e:
-    st.error(f"Error listing files: {str(e)}")
+# ------------- List Files (Optional for Local Path) -------------
+st.markdown("---")
+st.markdown("## 📁 View Files in a Folder")
 
+path = st.text_input("Enter folder path (e.g., C:/Users/Public):", "C:/Users/Public")
+if st.button("List Files"):
+    try:
+        files = os.listdir(path)
+        st.write(files)
+    except Exception as e:
+        st.error(f"Error accessing folder: {str(e)}")
 
+st.markdown("---")
+st.markdown("<p style='text-align:center; color:gray;'>Developed with ❤️ using Python and Streamlit</p>", unsafe_allow_html=True)
